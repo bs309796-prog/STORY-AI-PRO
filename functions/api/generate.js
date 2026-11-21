@@ -1,4 +1,9 @@
-
+export async function onRequestGet() {
+  return Response.json({
+    status: "API Connected",
+    message: "Cloudflare Function चालू है"
+  });
+}
 export async function onRequestPost({ request, env }) {
   try {
     if (!env.GEMINI_API_KEY) {
