@@ -3,35 +3,40 @@ export async function onRequestPost({ request, env }) {
   try {
     if (!env.GEMINI_API_KEY) {
       return Response.json(
-        { error: "Gemini API key is missing." },
+        { error: "Gemini API key Cloudflare में नहीं मिली।" },
         { status: 500 }
       );
     }
 
     const body = await request.json();
-    const idea = body.prompt || body.idea || "";
+    const idea = String(body.idea || body.prompt || "").trim();
 
-    if (!idea.trim()) {
+    if (!idea) {
       return Response.json(
-        { error: "Please enter a story idea." },
+        { error: "कहानी का आइडिया लिखिए।" },
         { status: 400 }
       );
     }
 
     const prompt = `
-आप एक बेहतरीन हिंदी कहानी लेखक हैं।
-इस आइडिया पर 1200 से 1500 शब्दों की
-भावनात्मक, रहस्यपूर्ण और अनोखी हिंदी कहानी लिखें।
+आप एक अनुभवी हिंदी कहानी लेखक हैं।
 
-कहानी में शुरुआत में दमदार Hook,
-बीच में दिलचस्प घटनाएँ और अंत में
-भावुक Climax तथा स्पष्ट नैतिक संदेश हो।
+यूजर के दिए गए आइडिया पर एक बिल्कुल नई,
+रोचक, भावनात्मक और अनोखी हिंदी कहानी लिखें।
 
 कहानी का आइडिया: ${idea}
 कहानी का प्रकार: ${body.storyType || "Moral Story"}
 वीडियो अवधि: ${body.duration || "8-10 minutes"}
 
-केवल पूरी कहानी हिंदी में लिखें।
+नियम:
+1. कहानी की शुरुआत दमदार और रहस्यपूर्ण हो।
+2. किरदारों के नाम और घटनाएँ मौलिक हों।
+3. कहानी में भावनाएँ, संघर्ष, सस्पेंस और ट्विस्ट हों।
+4. कहानी अधूरी न छोड़ें।
+5. अंत में एक अच्छी सीख दें।
+6. केवल हिंदी में कहानी लिखें।
+7. डेमो टेक्स्ट या तकनीकी निर्देश बिल्कुल न लिखें।
+8. लगभग 8000 से 10000 शब्दों की विस्तृत कहानी लिखें।
 `;
 
     const response = await fetch(
@@ -43,7 +48,16 @@ export async function onRequestPost({ request, env }) {
           "x-goog-api-key": env.GEMINI_API_KEY
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }]
+            }
+          ],
+          generationConfig: {
+            maxOutputTokens: 24000,
+            temperature: 0.9
+          }
         })
       }
     );
@@ -52,18 +66,21 @@ export async function onRequestPost({ request, env }) {
 
     if (!response.ok) {
       return Response.json(
-        { error: result.error?.message || "Gemini API error" },
+        {
+          error: result.error?.message || "Gemini API से जवाब नहीं मिला।"
+        },
         { status: response.status }
       );
     }
 
     const story = result.candidates?.[0]?.content?.parts
       ?.map(part => part.text || "")
-      .join("\n");
+      .join("\n")
+      .trim();
 
     if (!story) {
       return Response.json(
-        { error: "AI did not return a story." },
+        { error: "AI ने कहानी नहीं बनाई। दोबारा कोशिश करें।" },
         { status: 502 }
       );
     }
@@ -72,9 +89,8 @@ export async function onRequestPost({ request, env }) {
 
   } catch (error) {
     return Response.json(
-      { error: "Server error. Please try again." },
+      { error: error.message || "Server में समस्या आई।" },
       { status: 500 }
     );
   }
 }
-
